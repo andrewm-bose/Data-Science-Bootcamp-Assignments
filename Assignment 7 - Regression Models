@@ -1,0 +1,195 @@
+%matplotlib inline
+import matplotlib.pyplot as plt
+import pandas as pd
+from sklearn.neighbors import KNeighborsRegressor as knr
+from sklearn.metrics import mean_absolute_error
+
+
+columns = ['carat', 'cut', 'price']
+
+train = pd.DataFrame(columns=columns, 
+        data=[[0.3, 'Ideal', 422],
+        [0.31, 'Ideal', 489],
+        [0.42, 'Premium', 737],
+        [0.5, 'Ideal', 1415],
+        [0.51, 'Premium', 1177],
+        [0.7, 'Fair', 1865],
+        [0.73, 'Fair', 2351],
+        [1.01, 'Good', 3768],
+        [1.18, 'Very Good', 3965],
+        [1.18, 'Ideal', 4838]])
+
+test  = pd.DataFrame(columns=columns, 
+        data=[[0.3, 'Ideal', 432],
+        [0.34, 'Ideal', 687],
+        [0.37, 'Premium', 1124],
+        [0.4, 'Good', 720],
+        [0.51, 'Ideal', 1397],
+        [0.51, 'Very Good', 1284],
+        [0.59, 'Ideal', 1437],
+        [0.7, 'Ideal', 3419],
+        [0.9, 'Premium', 3484],
+        [0.9, 'Fair', 2964]])
+
+cut_ranks = {'Fair': 1, 'Good': 2, 'Very Good': 3, 'Premium': 4, 'Ideal': 5}
+train.cut = train.cut.map(cut_ranks)
+test.cut = test.cut.map(cut_ranks)
+
+
+
+
+#WHAT DOES TRAIN.CUT AND TEST.CUT LOOK LIKE?
+print(' ' , ['train','test'])
+for i in range(max(len(train.cut), len(test.cut))):
+  print(i, [train.cut[i], test.cut[i]])
+  
+  
+  
+  #CREATE NEAREST NEIGHBORS MODEL, K=1
+model = knr(n_neighbors = 1)
+features = ['carat', 'cut']
+target = 'price'
+model.fit(train[features], train[target])
+
+
+
+#WHAT DOES ACTUAL & PREDICTED TRAIN.PRICE VALUES LOOK LIKE (BASED ON CARAT & CUT)?
+y_true = train[target]
+y_pred = model.predict(train[features])
+train_error = mean_absolute_error(y_true, y_pred)
+
+print(' ' , ['Act','Pred'])
+for i in range(len(y_true)):
+  print(i, [y_true[i], y_pred[i]] ) 
+print('')
+print('Train Error: ' +str(train_error))
+
+
+
+#WHAT DOES ACTUAL & PREDICTED TEST.PRICE VALUES LOOK LIKE (BASED ON CARAT & CUT)?
+y_true = test[target]
+y_pred = model.predict(test[features])
+test_error = mean_absolute_error(y_true, y_pred)
+
+print(' ' , ['Act','Pred'])
+for i in range(len(y_true)):
+  print(i, [y_true[i], y_pred[i]])
+print('')
+print('Test Error: ' +str(test_error))
+
+
+
+import seaborn as sns
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split as tts
+
+df = sns.load_dataset('diamonds')
+df = df[df.price < 5000]
+train, test = tts(df.copy(), random_state=0)
+train.shape, test.shape
+
+
+
+
+#MAP CUT RANKS TO INTEGERS
+
+cut_ranks = {'Fair': 1, 'Good': 2, 'Very Good': 3, 'Premium': 4, 'Ideal': 5}
+train.cut = train.cut.map(cut_ranks)
+test.cut = test.cut.map(cut_ranks)
+
+
+
+#CREATE LINEAR REGRESSION MODEL 
+model = LinearRegression()
+features = ['carat', 'cut']
+target = 'price'
+
+model.fit(train[features], train[target])
+
+
+
+#CALCULATE TRAIN ABSOLUTE ERROR - PRICE VS CARAT,CUT
+y_train_true = train[target]
+y_train_pred = model.predict(train[features])
+train_error = mean_absolute_error(y_train_true, y_train_pred)
+
+#CALCULATE TEST ABSOLUTE ERROR - PRICE VS CARAT,CUT
+y_test_true = test[target]
+y_test_pred = model.predict(test[features])
+test_error = mean_absolute_error(y_test_true, y_test_pred)
+
+print("Train Error: " + str(train_error))
+print("Test Error: " + str(test_error))
+
+
+
+#PREDICT PRICE BASED ON CARAT AND CUT QUALITY  - ONE INSTANCE
+carat = 0.5
+cut_str = 'Very Good'
+cut = cut_ranks[cut_str]
+print('Predicted price for ' + str(carat) + ' carat & ' + str(cut_str) 
+      + ' cut quality: $' + str(model.predict([[carat,cut]])))
+      
+      
+      
+#SANITY CHECK FOR ME, IS THE ABOVE A REASONABLE PREDICTION?
+
+#filter by carart
+f_carat = df[df.carat == carat]
+
+#filter by cut
+f_cut = f_carat[f_carat.cut == 'Very Good']
+f_cut = f_cut.sort_values(by='carat')
+print(f_cut.head(20))
+
+
+train.describe(include=['object'])
+
+
+
+#CONVERT CLARITY AND COLOR TO INTEGERS FOR TRAIN DATA
+clarity_rank = {"IF":0,"VVS1":1, "VVS2":2,"VS1":3, "VS2":4,"SI1":5, "SI2":6, "I1":7}
+color_rank = {"J":7, "I":6, "H":5, "G":4, "F":3, "E":2, "D":1 }
+
+train.clarity = train.clarity.map(clarity_rank) 
+train.color = train.color.map(color_rank)
+
+#CONVERT CLARITY AND COLOR TO INTEGERS FOR THE TEST DATA
+test.clarity = test.clarity.map(clarity_rank)
+test.color = test.color.map(color_rank)
+
+
+
+#CHECKPOINT - DOES THE DATA LOOK RIGHT?
+print(test.head())
+print(test.isnull().sum())
+print(train.head())
+print(train.isnull().sum())
+
+
+
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import PolynomialFeatures
+
+#CREATE MODEL - DEFINE FEATURES & MODEL
+features3 = ['carat','clarity']
+
+for n in range(1,13):      #CHOOSE N-DEGREES HERE
+  target3 = ['price']
+  model3 = make_pipeline(PolynomialFeatures(degree=n), LinearRegression())
+  #model3 = make_pipeline(knr(n_neighbors=n))
+  model3.fit(train[features3],train[target3])
+
+#CALCULATE TRAINING ERROR
+  y3_train_true = train[target3]
+  y3_train_pred = model3.predict(train[features3])
+  train3_error = mean_absolute_error(y3_train_true, y3_train_pred)
+
+#CALCULATE TEST ERROR
+  y3_test_true = test[target3]
+  y3_test_pred = model3.predict(test[features3])
+  test3_error = mean_absolute_error(y3_test_true, y3_test_pred)
+  
+  print('Poly degree = ' + str(n))
+  print('Train error: ' + str(train3_error))
+  print('Test error: ' + str(test3_error))
